@@ -1,5 +1,16 @@
 import { NextResponse } from 'next/server';
-import { kv } from '@vercel/kv';
+import { createClient } from '@vercel/kv';
+
+const getKvClient = () => {
+  const url = process.env.KV_REST_API_URL || process.env.UPSTASH_REDIS_REST_URL;
+  const token = process.env.KV_REST_API_TOKEN || process.env.UPSTASH_REDIS_REST_TOKEN;
+  
+  if (!url || !token) {
+    return null;
+  }
+  
+  return createClient({ url, token });
+};
 
 export async function GET(request) {
   const { searchParams } = new URL(request.url);
@@ -9,9 +20,9 @@ export async function GET(request) {
     return NextResponse.json({ error: 'Missing sync key' }, { status: 400 });
   }
 
-  // Graceful fallback if Vercel KV isn't configured yet
-  if (!process.env.KV_REST_API_URL) {
-    return NextResponse.json({ error: 'KV DB not linked in Vercel' }, { status: 501 });
+  const kv = getKvClient();
+  if (!kv) {
+    return NextResponse.json({ error: 'Upstash Redis not linked in Vercel' }, { status: 501 });
   }
 
   try {
@@ -31,8 +42,9 @@ export async function POST(request) {
       return NextResponse.json({ error: 'Missing sync key' }, { status: 400 });
     }
 
-    if (!process.env.KV_REST_API_URL) {
-      return NextResponse.json({ error: 'KV DB not linked in Vercel' }, { status: 501 });
+    const kv = getKvClient();
+    if (!kv) {
+      return NextResponse.json({ error: 'Upstash Redis not linked in Vercel' }, { status: 501 });
     }
 
     await kv.set(`roadmap_sync_${syncKey}`, data);
